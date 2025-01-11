@@ -4,8 +4,9 @@
   "packageManager": "pnpm@9.15.3",
   "scripts": {
     "build": "vite-ssg build",
-    "dev": "vite --port 3333 --open",
+    "dev": "vite --port 3333",
     "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
     "preview": "vite preview",
     "preview-https": "serve dist",
     "test": "vitest",
@@ -19,15 +20,25 @@
   "dependencies": {
     "@unhead/vue": "^1.11.15",
     "@unocss/reset": "^0.65.4",
+    "@vue-flow/background": "^1.3.2",
+    "@vue-flow/controls": "^1.1.2",
+    "@vue-flow/core": "^1.41.7",
+    "@vue-flow/minimap": "^1.5.0",
     "@vueuse/core": "^12.3.0",
     "@vueuse/head": "^2.0.0",
+    "@xsai/generate-text": "^0.0.26",
+    "@xsai/providers": "^0.0.26",
+    "@xsai/stream-text": "^0.0.26",
+    "@xsai/tool": "^0.0.26",
     "beasties": "^0.2.0",
     "nprogress": "^0.2.0",
     "pinia": "^2.3.0",
+    "pinia-plugin-persistedstate": "^4.2.0",
     "vue": "^3.5.13",
     "vue-demi": "^0.14.10",
     "vue-i18n": "^11.0.1",
-    "vue-router": "^4.5.0"
+    "vue-router": "^4.5.0",
+    "xsai": "^0.0.26"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^3.12.2",

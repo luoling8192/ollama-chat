@@ -2,10 +2,11 @@ import type { UserModule } from './types'
 
 import { setupLayouts } from 'virtual:generated-layouts'
 import { ViteSSG } from 'vite-ssg'
+
 import { routes } from 'vue-router/auto-routes'
 import App from './App.vue'
-
 import '@unocss/reset/tailwind.css'
+
 import './styles/main.css'
 import 'uno.css'
 
@@ -16,10 +17,10 @@ export const createApp = ViteSSG(
     routes: setupLayouts(routes),
     base: import.meta.env.BASE_URL,
   },
-  (ctx) => {
+  async (ctx) => {
     // install all modules under `modules/`
-    Object.values(import.meta.glob<{ install: UserModule }>('./modules/*.ts', { eager: true }))
-      .forEach(i => i.install?.(ctx))
-    // ctx.app.use(Previewer)
+    const modules = Object.values(import.meta.glob<{ install: UserModule }>('./modules/*.ts', { eager: true }))
+    for (const { install } of modules)
+      await install?.(ctx)
   },
 )
