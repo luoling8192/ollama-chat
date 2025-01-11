@@ -115,7 +115,7 @@ onMounted(() => {
             class="group rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-neutral-700"
             :class="{ 'bg-blue-50 dark:bg-blue-900/20': thread.id === chatStore.activeThreadId }"
           >
-            <div class="flex items-center justify-between">
+            <div class="flex cursor-pointer items-center justify-between" @click="switchThread(thread)">
               <div class="flex-1">
                 <div v-if="editingThreadId === thread.id" class="flex items-center gap-2">
                   <input
@@ -141,7 +141,6 @@ onMounted(() => {
                 <div v-else>
                   <button
                     class="flex-1 text-left font-medium"
-                    @click="switchThread(thread)"
                   >
                     {{ thread.title }}
                   </button>

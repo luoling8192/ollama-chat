@@ -74,7 +74,6 @@ export class OpenAIAdapter extends BaseModelAdapter {
         top_p: params.topP,
         frequency_penalty: params.frequencyPenalty,
         presence_penalty: params.presencePenalty,
-        stream: true,
       })
 
       for await (const textPart of textStream) {
