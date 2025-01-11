@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Edge, Node } from '@vue-flow/core'
-import type { Branch, Message } from '~/types'
+import type { Edge, Node, NodeMouseEvent } from '@vue-flow/core'
+import type { Branch, Message, Thread } from '~/types'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { useVueFlow, VueFlow } from '@vue-flow/core'
@@ -14,37 +14,44 @@ const emit = defineEmits<{
 
 const chatStore = useChatStore()
 
-interface MessageNode extends Node {
-  data: {
-    label: string
-    message: Message
-  }
+interface FlowNodeData {
+  label: string
 }
 
-interface BranchNode extends Node {
-  data: {
-    label: string
-    branch: Branch
-  }
+interface MessageNodeData extends FlowNodeData {
+  message: Message
 }
 
-type FlowNode = MessageNode | BranchNode
+interface BranchNodeData extends FlowNodeData {
+  branch: Branch
+}
 
-const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useVueFlow<FlowNode>()
+type FlowNode = Node<MessageNodeData> | Node<BranchNodeData>
 
-// 将分支树转换为 Vue Flow 节点
-function createNodes(messages: Message[], branches: Branch[]): Node[] {
-  const messageNodes: Node[] = messages.map(msg => ({
-    id: msg.id,
+const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useVueFlow()
+
+const LAYOUT_CONFIG = {
+  VERTICAL_SPACING: 80,
+  HORIZONTAL_SPACING: 200,
+  BRANCH_OFFSET: 50,
+} as const
+
+function createMessageNode(message: Message): Node<MessageNodeData> {
+  const truncatedContent = message.content.value.slice(0, 50) + (message.content.value.length > 50 ? '...' : '')
+
+  return {
+    id: message.id,
     type: 'default',
-    position: { x: 0, y: 0 }, // 位置将在后面计算
+    position: { x: 0, y: 0 },
     data: {
-      label: msg.content.value.slice(0, 50) + (msg.content.value.length > 50 ? '...' : ''),
-      message: msg,
+      label: truncatedContent,
+      message,
     },
-  }))
+  }
+}
 
-  const branchNodes: Node[] = branches.map(branch => ({
+function createBranchNode(branch: Branch): Node<BranchNodeData> {
+  return {
     id: branch.id,
     type: 'group',
     position: { x: 0, y: 0 },
@@ -58,118 +65,117 @@ function createNodes(messages: Message[], branches: Branch[]): Node[] {
       borderRadius: '8px',
       padding: '10px',
     },
-  }))
+  }
+}
 
+function createNodes(messages: Message[], branches: Branch[]): FlowNode[] {
+  const messageNodes = messages.map(createMessageNode)
+  const branchNodes = branches.map(createBranchNode)
   return [...messageNodes, ...branchNodes]
 }
 
-// 创建边连接
-function createEdges(messages: Message[], branches: Branch[]): Edge[] {
-  const edges: Edge[] = []
-
-  // 消息之间的连接
-  messages.forEach((msg, index) => {
-    if (index > 0) {
-      edges.push({
-        id: `${messages[index - 1].id}-${msg.id}`,
-        source: messages[index - 1].id,
-        target: msg.id,
-        type: 'smoothstep',
-      })
-    }
-  })
-
-  // 分支连接
-  branches.forEach((branch) => {
-    if (branch.parentMessageId) {
-      edges.push({
-        id: `${branch.parentMessageId}-${branch.id}`,
-        source: branch.parentMessageId,
-        target: branch.id,
-        type: 'smoothstep',
-        style: { stroke: '#6366f1' },
-      })
-    }
-  })
-
-  return edges
+function createMessageEdge(sourceId: string, targetId: string): Edge {
+  return {
+    id: `${sourceId}-${targetId}`,
+    source: sourceId,
+    target: targetId,
+    type: 'smoothstep',
+  }
 }
 
-// 计算节点位置
-function layoutNodes(nodes: Node[], branches: Branch[]) {
-  const VERTICAL_SPACING = 80
-  const HORIZONTAL_SPACING = 200
+function createBranchEdge(parentMessageId: string, branchId: string): Edge {
+  return {
+    id: `${parentMessageId}-${branchId}`,
+    source: parentMessageId,
+    target: branchId,
+    type: 'smoothstep',
+    style: { stroke: '#6366f1' },
+  }
+}
+
+function createEdges(messages: Message[], branches: Branch[]): Edge[] {
+  const messageEdges = messages.slice(1).map((msg, index) =>
+    createMessageEdge(messages[index].id, msg.id),
+  )
+
+  const branchEdges = branches
+    .filter(branch => branch.parentMessageId)
+    .map(branch => createBranchEdge(branch.parentMessageId!, branch.id))
+
+  return [...messageEdges, ...branchEdges]
+}
+
+function layoutNodes(nodes: FlowNode[], branches: Branch[]) {
   let currentY = 0
 
-  // 按分支组织消息
   branches.forEach((branch, branchIndex) => {
     const branchMessages = nodes.filter(
-      node => 'message' in node.data && node.data.message.branchId === branch.id,
+      node => node.data && 'message' in node.data && node.data.message.branchId === branch.id,
     )
 
-    // 设置分支节点位置
     const branchNode = nodes.find(node => node.id === branch.id)
     if (branchNode) {
       branchNode.position = {
-        x: branchIndex * HORIZONTAL_SPACING,
+        x: branchIndex * LAYOUT_CONFIG.HORIZONTAL_SPACING,
         y: currentY,
       }
     }
 
-    // 设置消息节点位置
     branchMessages.forEach((node, index) => {
       node.position = {
-        x: branchIndex * HORIZONTAL_SPACING + 50,
-        y: currentY + (index + 1) * VERTICAL_SPACING,
+        x: branchIndex * LAYOUT_CONFIG.HORIZONTAL_SPACING + LAYOUT_CONFIG.BRANCH_OFFSET,
+        y: currentY + (index + 1) * LAYOUT_CONFIG.VERTICAL_SPACING,
       }
     })
 
-    currentY += (branchMessages.length + 2) * VERTICAL_SPACING
+    currentY += (branchMessages.length + 2) * LAYOUT_CONFIG.VERTICAL_SPACING
   })
 }
 
-// 监听当前线程变化
+function updateFlow(thread: Thread | null) {
+  if (!thread)
+    return
+
+  const allMessages = Object.values(chatStore.messages)
+    .filter(msg => msg.threadId === thread.id)
+  const newNodes = createNodes(allMessages, thread.branches)
+  const newEdges = createEdges(allMessages, thread.branches)
+
+  layoutNodes(newNodes, thread.branches)
+
+  nodes.value = newNodes as any
+  edges.value = newEdges as any
+}
+
 watch(
   () => chatStore.currentThread,
-  (thread) => {
-    if (!thread)
-      return
-
-    const allMessages = Object.values(chatStore.messages)
-      .filter(msg => msg.threadId === thread.id)
-    const newNodes = createNodes(allMessages, thread.branches)
-    const newEdges = createEdges(allMessages, thread.branches)
-
-    layoutNodes(newNodes, thread.branches)
-
-    nodes.value = newNodes
-    edges.value = newEdges
-  },
+  updateFlow,
   { immediate: true },
 )
 
-// 处理节点点击
-async function onNodeClick(event: any, node: FlowNode) {
+async function scrollToFirstMessage(branchId: string) {
+  const branchMessages = Object.values(chatStore.messages)
+    .filter(m => m.branchId === branchId)
+    .sort((a, b) => a.timestamp - b.timestamp)
+
+  if (branchMessages.length > 0) {
+    await nextTick()
+    const messageEl = document.getElementById(`message-${branchMessages[0].id}`)
+    messageEl?.scrollIntoView({ behavior: 'smooth' })
+  }
+}
+
+function onNodeClick(event: NodeMouseEvent, node: FlowNode) {
+  if (!node.data)
+    return
+
   if ('message' in node.data) {
-    // 如果是消息节点，显示创建分支对话框
     emit('branch', node.data.message)
   }
   else if ('branch' in node.data) {
-    // 如果是分支节点，切换到该分支并滚动到相应消息
-    await chatStore.switchBranch(node.data.branch.id)
-
-    // 获取分支的第一条消息
-    const branchMessages = Object.values(chatStore.messages)
-      .filter(m => m.branchId === node.data.branch.id)
-      .sort((a, b) => a.timestamp - b.timestamp)
-
-    if (branchMessages.length > 0) {
-      // 使用 nextTick 确保 DOM 已更新
-      await nextTick()
-      const messageEl = document.getElementById(`message-${branchMessages[0].id}`)
-      if (messageEl)
-        messageEl.scrollIntoView({ behavior: 'smooth' })
-    }
+    void chatStore.switchBranch(node.data.branch.id).then(() => {
+      void scrollToFirstMessage(node.data.branch.id)
+    })
   }
 }
 </script>

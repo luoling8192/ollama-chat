@@ -52,7 +52,7 @@ function toggleBranchView() {
       >
         <BranchView
           v-if="showBranchView || selectedMessage"
-          :message="selectedMessage"
+          :message="selectedMessage || undefined"
           @close="showBranchView = false; selectedMessage = null"
         />
       </Transition>

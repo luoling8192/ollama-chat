@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { acceptHMRUpdate, defineStore } from 'pinia'
 import { isDark } from '~/composables/dark'
 
 interface SettingsState {
@@ -8,31 +8,45 @@ interface SettingsState {
   isDark: boolean
 }
 
-export const useSettingsStore = defineStore('settings', {
-  state: (): SettingsState => ({
-    apiKey: '',
-    baseUrl: 'https://api.openai.com/v1',
-    userName: '',
-    isDark: isDark.value,
-  }),
+export const useSettingsStore = defineStore('settings', () => {
+  const apiKey = ref('')
+  const baseUrl = ref('https://api.openai.com/v1')
+  const userName = ref('')
+  const isDarkValue = ref(isDark.value)
 
+  function updateSettings(settings: Partial<SettingsState>) {
+    if (settings.apiKey !== undefined)
+      apiKey.value = settings.apiKey
+    if (settings.baseUrl !== undefined)
+      baseUrl.value = settings.baseUrl
+    if (settings.userName !== undefined)
+      userName.value = settings.userName
+    if (settings.isDark !== undefined) {
+      isDarkValue.value = settings.isDark
+      isDark.value = settings.isDark
+    }
+  }
+
+  function clearSettings() {
+    apiKey.value = ''
+    baseUrl.value = 'https://api.openai.com/v1'
+    userName.value = ''
+  }
+
+  return {
+    apiKey,
+    baseUrl,
+    userName,
+    isDark: isDarkValue,
+    updateSettings,
+    clearSettings,
+  }
+}, {
   persist: {
     key: 'chat-settings',
     storage: localStorage,
-    paths: ['apiKey', 'baseUrl', 'userName', 'isDark'],
-  },
-
-  actions: {
-    updateSettings(settings: Partial<SettingsState>) {
-      Object.assign(this, settings)
-      if (settings.isDark !== undefined)
-        isDark.value = settings.isDark
-    },
-
-    clearSettings() {
-      this.apiKey = ''
-      this.baseUrl = 'https://api.openai.com/v1'
-      this.userName = ''
-    },
   },
 })
+
+if (import.meta.hot)
+  import.meta.hot.accept(acceptHMRUpdate(useSettingsStore as any, import.meta.hot))

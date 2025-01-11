@@ -39,12 +39,7 @@ export class OpenAIAdapter extends BaseModelAdapter {
       const openai = this.getClient()
       const { text } = await generateText({
         ...openai.chat(this.currentThread?.metadata.model ?? 'gpt-3.5-turbo'),
-        messages: [
-          {
-            content: prompt,
-            role: 'user',
-          },
-        ],
+        messages: [{ content: prompt, role: 'user' }],
         temperature: params.temperature,
         max_tokens: params.maxTokens,
         top_p: params.topP,
@@ -73,12 +68,7 @@ export class OpenAIAdapter extends BaseModelAdapter {
       const openai = this.getClient()
       const { textStream } = await streamText({
         ...openai.chat(this.currentThread?.metadata.model ?? 'gpt-3.5-turbo'),
-        messages: [
-          {
-            content: prompt,
-            role: 'user',
-          },
-        ],
+        messages: [{ content: prompt, role: 'user' }],
         temperature: params.temperature,
         max_tokens: params.maxTokens,
         top_p: params.topP,

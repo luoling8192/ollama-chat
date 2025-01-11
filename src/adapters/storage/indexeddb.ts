@@ -1,6 +1,12 @@
 import type { StorageAdapter } from './base'
 import type { Branch, Message, Thread } from '~/types'
 
+type StorableThread = Omit<Thread, 'messages' | 'branches'>
+
+function toRawObject<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj))
+}
+
 export class IndexedDBAdapter implements StorageAdapter {
   private db: IDBDatabase | null = null
   private readonly DB_NAME = 'chatbot'
@@ -48,8 +54,16 @@ export class IndexedDBAdapter implements StorageAdapter {
   // Thread 操作
   async createThread(thread: Thread): Promise<void> {
     const store = await this.getStore('threads', 'readwrite')
+    const storableThread: StorableThread = toRawObject({
+      id: thread.id,
+      title: thread.title,
+      metadata: thread.metadata,
+      createdAt: thread.createdAt,
+      updatedAt: thread.updatedAt,
+    })
+
     await new Promise<void>((resolve, reject) => {
-      const request = store.add(thread)
+      const request = store.add(storableThread)
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve()
     })
@@ -57,17 +71,35 @@ export class IndexedDBAdapter implements StorageAdapter {
 
   async getThread(id: string): Promise<Thread> {
     const store = await this.getStore('threads')
-    return new Promise((resolve, reject) => {
+    const thread = await new Promise<StorableThread>((resolve, reject) => {
       const request = store.get(id)
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve(request.result)
     })
+
+    // 加载消息和分支
+    const messages = await this.getMessages(id)
+    const branches = await this.getBranches(id)
+
+    return {
+      ...thread,
+      messages,
+      branches,
+    }
   }
 
   async updateThread(thread: Thread): Promise<void> {
     const store = await this.getStore('threads', 'readwrite')
+    const storableThread: StorableThread = toRawObject({
+      id: thread.id,
+      title: thread.title,
+      metadata: thread.metadata,
+      createdAt: thread.createdAt,
+      updatedAt: thread.updatedAt,
+    })
+
     await new Promise<void>((resolve, reject) => {
-      const request = store.put(thread)
+      const request = store.put(storableThread)
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve()
     })
