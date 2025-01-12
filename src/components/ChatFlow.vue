@@ -33,6 +33,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   close: []
+  branch: [messageId: string]
 }>()
 
 const logger = useLogg('ChatFlow').useGlobalConfig()
@@ -66,6 +67,7 @@ const nodeFactory = {
         role: message.role,
         content: typeof message.content === 'string' ? message.content : message.content.value,
         messageId: message.id,
+        onBranch: (messageId: string) => emit('branch', messageId),
       },
     }
   },

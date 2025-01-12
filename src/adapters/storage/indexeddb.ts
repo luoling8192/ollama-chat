@@ -117,8 +117,18 @@ export class IndexedDBAdapter implements StorageAdapter {
   // Message 操作
   async addMessage(message: Message): Promise<void> {
     const store = await this.getStore('messages', 'readwrite')
+
+    const storableMessage = toRawObject({
+      id: message.id,
+      threadId: message.threadId,
+      branchId: message.branchId,
+      role: message.role,
+      content: message.content,
+      timestamp: message.timestamp,
+    })
+
     await new Promise<void>((resolve, reject) => {
-      const request = store.add(message)
+      const request = store.add(storableMessage)
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve()
     })

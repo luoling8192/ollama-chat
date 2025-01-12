@@ -4,7 +4,6 @@ import { db } from '~/modules/database'
 import { useChatStore } from '~/stores/chat'
 
 const chatStore = useChatStore()
-const selectedMessage = ref<Message | null>(null)
 const isDrawerOpen = ref(false)
 
 onMounted(async () => {
@@ -15,8 +14,24 @@ onMounted(async () => {
   }
 })
 
-function handleBranch(message: Message) {
-  selectedMessage.value = message
+async function handleBranch(messageId: string) {
+  if (!chatStore.currentThread)
+    return
+
+  const newThread = await chatStore.createThread(`Branch from ${messageId}`)
+
+  const contextMessages = await chatStore.getMessageContext(messageId)
+
+  for (const msg of contextMessages) {
+    await db.addMessage({
+      ...msg,
+      id: crypto.randomUUID(),
+      threadId: newThread.id,
+      branchId: 'main',
+    })
+  }
+
+  await chatStore.switchThread(newThread)
 }
 
 function toggleDrawer() {
@@ -29,7 +44,7 @@ function toggleDrawer() {
     <TheHeader />
     <div class="relative flex flex-1">
       <div class="flex-1">
-        <ChatThread @branch="handleBranch" />
+        <ChatThread @branch="(message: Message) => handleBranch(message.id)" />
       </div>
       <button
         class="fixed bottom-4 right-4 rounded-full bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
@@ -47,6 +62,7 @@ function toggleDrawer() {
             :messages="chatStore.currentMessages"
             :branches="chatStore.currentBranches"
             @close="toggleDrawer"
+            @branch="handleBranch"
           />
         </div>
       </div>
