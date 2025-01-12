@@ -27,8 +27,8 @@ function handleBranch() {
     }"
   >
     <Handle
-      type="target"
-      :position="Position.Top"
+      type="source"
+      :position="Position.Left"
     />
     <div class="absolute right-2 -top-3">
       <button
@@ -47,7 +47,7 @@ function handleBranch() {
     </div>
     <Handle
       type="source"
-      :position="Position.Bottom"
+      :position="Position.Right"
     />
   </div>
 </template>
@@ -57,9 +57,22 @@ function handleBranch() {
   background: #555;
   width: 8px;
   height: 8px;
+  border-radius: 50%;
 }
 
 .vue-flow__handle:hover {
   background: #777;
+}
+
+:deep(.vue-flow__edge-path) {
+  stroke: #555;
+  stroke-width: 2;
+  fill: none;
+}
+
+:deep(.vue-flow__edge) {
+  path {
+    stroke-dasharray: none;
+  }
 }
 </style>

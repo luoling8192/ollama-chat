@@ -40,7 +40,6 @@ const logger = useLogg('ChatFlow').useGlobalConfig()
 const nodes = ref<ChatNode[]>([])
 const edges = ref<ChatEdge[]>([])
 
-// Default configuration that can be overridden via props
 const flowConfig = computed<FlowConfig>(() => ({
   spacing: {
     horizontal: 100,
@@ -55,133 +54,112 @@ const flowConfig = computed<FlowConfig>(() => ({
   ...props.config,
 }))
 
-// Flow node factory
-const nodeFactory = {
-  createMessageNode(message: Message, position: Position): ChatNode {
-    logger.withFields({ messageId: message.id, position }).debug('Creating node')
-    return {
-      id: message.id,
-      type: 'messageNode',
-      position,
-      data: {
-        role: message.role,
-        content: typeof message.content === 'string' ? message.content : message.content.value,
-        messageId: message.id,
-        onBranch: (messageId: string) => emit('branch', messageId),
-      },
-    }
-  },
+function createMessageNode(message: Message, position: Position): ChatNode {
+  logger.withFields({ messageId: message.id, position }).debug('Creating node')
+  return {
+    id: message.id,
+    type: 'messageNode',
+    position,
+    data: {
+      role: message.role,
+      content: typeof message.content === 'string' ? message.content : message.content.value,
+      messageId: message.id,
+      onBranch: (messageId: string) => emit('branch', messageId),
+    },
+  }
+}
 
-  createRootNode(): ChatNode {
-    logger.withFields({ type: 'root' }).debug('Creating root node')
-    return this.createMessageNode(
-      {
-        id: 'root',
-        role: 'system',
-        content: { value: 'Chat Start' },
-      } as Message,
-      { x: 0, y: 0 },
+function createRootNode(): ChatNode {
+  logger.withFields({ type: 'root' }).debug('Creating root node')
+  return createMessageNode(
+    {
+      id: 'root',
+      role: 'system',
+      content: { value: 'Chat Start' },
+    } as Message,
+    { x: 0, y: 0 },
+  )
+}
+
+function createEdge(sourceId: string, targetId: string): ChatEdge {
+  logger.withFields({ sourceId, targetId }).debug('Creating edge')
+  return {
+    id: `e-${sourceId}-${targetId}`,
+    source: sourceId,
+    target: targetId,
+    type: 'default',
+    animated: true,
+    style: { stroke: '#555', strokeWidth: 2 },
+  }
+}
+
+function calculatePosition(branchIndex: number, messageIndex: number): Position {
+  const position = {
+    x: branchIndex * flowConfig.value.spacing.horizontal,
+    y: messageIndex * flowConfig.value.spacing.vertical,
+  }
+  logger.withFields({ branchIndex, messageIndex, position }).debug('Calculating position')
+  return position
+}
+
+function processBranch(messages: Message[], startX: number, startY: number, initialParentId: string, flowNodes: ChatNode[], flowEdges: ChatEdge[]): void {
+  logger.withFields({ messagesCount: messages.length, startX, startY, initialParentId }).debug('Processing branch')
+
+  messages.reduce((currentParentId, message) => {
+    const node = createMessageNode(message, { x: startX, y: startY })
+    flowNodes.push(node)
+
+    const isFirstMessageInBranch = message.id === messages[0].id
+    if (currentParentId !== 'root' || !isFirstMessageInBranch) {
+      flowEdges.push(createEdge(currentParentId, message.id))
+    }
+
+    return message.id
+  }, initialParentId)
+}
+
+function buildFlow(messages: Message[], branches: Branch[]) {
+  logger.withFields({ messagesCount: messages.length, branchesCount: branches.length }).debug('Constructing flow elements')
+  const flowNodes: ChatNode[] = [createRootNode()]
+  const flowEdges: ChatEdge[] = []
+
+  const mainBranchPosition = calculatePosition(0, 1)
+  processBranch(messages, mainBranchPosition.x, mainBranchPosition.y, 'root', flowNodes, flowEdges)
+
+  branches.forEach((branch, index) => {
+    const parentMessage = messages.find(m => m.id === branch.parentMessageId)
+    if (!parentMessage)
+      return
+
+    const parentIndex = messages.indexOf(parentMessage)
+    const position = calculatePosition(index + 1, parentIndex + 1)
+
+    processBranch(
+      branch.messages,
+      position.x,
+      position.y,
+      branch.parentMessageId || 'root',
+      flowNodes,
+      flowEdges,
     )
-  },
-}
+  })
 
-// Edge factory
-const edgeFactory = {
-  create(sourceId: string, targetId: string): ChatEdge {
-    logger.withFields({ sourceId, targetId }).debug('Creating edge')
-    return {
-      id: `e-${sourceId}-${targetId}`,
-      source: sourceId,
-      target: targetId,
-      type: 'smoothstep',
-    }
-  },
-}
-
-// Position calculator
-const positionCalculator = {
-  calculate(branchIndex: number, messageIndex: number): Position {
-    const position = {
-      x: branchIndex * flowConfig.value.spacing.horizontal,
-      y: messageIndex * flowConfig.value.spacing.vertical,
-    }
-    logger.withFields({ branchIndex, messageIndex, position }).debug('Calculating position')
-    return position
-  },
-}
-
-// Branch processor
-const branchProcessor = {
-  process(messages: Message[], startX: number, startY: number, initialParentId: string, flowNodes: ChatNode[], flowEdges: ChatEdge[]): void {
-    logger.withFields({ messagesCount: messages.length, startX, startY, initialParentId }).debug('Processing branch')
-    let currentParentId = initialParentId
-
-    messages.forEach((message) => {
-      const node = nodeFactory.createMessageNode(message, { x: startX, y: startY })
-      flowNodes.push(node)
-
-      const isFirstMessageInBranch = message.id === messages[0].id
-      if (currentParentId !== 'root' || !isFirstMessageInBranch) {
-        flowEdges.push(edgeFactory.create(currentParentId, message.id))
-      }
-
-      currentParentId = message.id
-    })
-  },
-}
-
-// Flow builder
-const flowBuilder = {
-  build(messages: Message[], branches: Branch[]) {
-    logger.withFields({ messagesCount: messages.length, branchesCount: branches.length }).debug('Constructing flow elements')
-    const flowNodes: ChatNode[] = [nodeFactory.createRootNode()]
-    const flowEdges: ChatEdge[] = []
-
-    // Process main message thread
-    const mainBranchPosition = positionCalculator.calculate(0, 1)
-    branchProcessor.process(messages, mainBranchPosition.x, mainBranchPosition.y, 'root', flowNodes, flowEdges)
-
-    // Process branches
-    branches.forEach((branch, index) => {
-      const parentMessage = messages.find(m => m.id === branch.parentMessageId)
-      if (!parentMessage)
-        return
-
-      const parentIndex = messages.indexOf(parentMessage)
-      const position = positionCalculator.calculate(index + 1, parentIndex + 1)
-
-      branchProcessor.process(
-        branch.messages,
-        position.x,
-        position.y,
-        branch.parentMessageId || 'root',
-        flowNodes,
-        flowEdges,
-      )
-    })
-
-    return { nodes: flowNodes, edges: flowEdges }
-  },
+  return { nodes: flowNodes, edges: flowEdges }
 }
 
 const { layout } = useLayout()
-
 const { fitView } = useVueFlow()
 
 async function layoutGraph(direction: 'LR' | 'TB') {
   nodes.value = layout(nodes.value, edges.value, direction)
-
-  nextTick(() => {
-    fitView()
-  })
+  nextTick(() => fitView())
 }
 
-// Update flow on props change
 watch(
   [() => props.messages, () => props.branches],
   ([newMessages, newBranches]) => {
     logger.withFields({ messagesCount: newMessages.length, branchesCount: newBranches.length }).debug('Updating flow')
-    const { nodes: flowNodes, edges: flowEdges } = flowBuilder.build(newMessages, newBranches)
+    const { nodes: flowNodes, edges: flowEdges } = buildFlow(newMessages, newBranches)
     nodes.value = flowNodes
     edges.value = flowEdges
   },
