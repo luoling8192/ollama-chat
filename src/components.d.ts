@@ -9,8 +9,10 @@ declare module 'vue' {
   export interface GlobalComponents {
     BranchFlow: typeof import('./components/BranchFlow.vue')['default']
     BranchView: typeof import('./components/BranchView.vue')['default']
+    ChatFlow: typeof import('./components/ChatFlow.vue')['default']
     ChatHistory: typeof import('./components/ChatHistory.vue')['default']
     ChatThread: typeof import('./components/ChatThread.vue')['default']
+    MessageNode: typeof import('./components/MessageNode.vue')['default']
     ModelSelector: typeof import('./components/ModelSelector.vue')['default']
     README: typeof import('./components/README.md')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

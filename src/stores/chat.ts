@@ -4,20 +4,36 @@ import { OpenAIAdapter } from '~/adapters/model/openai'
 import { db } from '~/modules/database'
 
 export const useChatStore = defineStore('chat', () => {
-  const activeThreadId = ref<string | null>(null)
-  const activeBranchId = ref<string | null>(null)
+  const activeThreadId = ref<string | undefined>(undefined)
+  const activeBranchId = ref<string | undefined>(undefined)
   const threads = ref<Record<string, Thread>>({})
   const messages = ref<Record<string, Message>>({})
   const branches = ref<Record<string, Branch>>({})
   const isLoading = ref(false)
-  const error = ref<Error | null>(null)
+  const error = ref<Error | undefined>(undefined)
 
-  const currentThread = computed((): Thread | null => {
-    return activeThreadId.value ? threads.value[activeThreadId.value] : null
+  const currentMessages = computed((): Message[] => {
+    return Object.values(messages.value)
+      .filter(msg => msg.threadId === activeThreadId.value)
+      .sort((a, b) => a.timestamp - b.timestamp)
   })
 
-  const currentBranch = computed((): Branch | null => {
-    return activeBranchId.value ? branches.value[activeBranchId.value] : null
+  const rawCurrentMessages = computed((): Message[] => {
+    return toRaw(currentMessages.value)
+  })
+
+  const currentBranches = computed((): Branch[] => {
+    return Object.values(branches.value)
+      .filter(branch => branch.threadId === activeThreadId.value)
+      .sort((a, b) => a.createdAt - b.createdAt)
+  })
+
+  const currentThread = computed((): Thread | undefined => {
+    return activeThreadId.value ? threads.value[activeThreadId.value] : undefined
+  })
+
+  const currentBranch = computed((): Branch | undefined => {
+    return activeBranchId.value ? branches.value[activeBranchId.value] : undefined
   })
 
   const branchTree = computed((): BranchNode[] => {
@@ -257,9 +273,9 @@ export const useChatStore = defineStore('chat', () => {
   async function clearState(): Promise<void> {
     messages.value = {}
     branches.value = {}
-    activeThreadId.value = null
-    activeBranchId.value = null
-    error.value = null
+    activeThreadId.value = undefined
+    activeBranchId.value = undefined
+    error.value = undefined
   }
 
   async function switchThread(thread: Thread): Promise<void> {
@@ -320,6 +336,9 @@ export const useChatStore = defineStore('chat', () => {
     error,
     currentThread,
     currentBranch,
+    currentMessages,
+    rawCurrentMessages,
+    currentBranches,
     branchTree,
     createThread,
     sendMessage,

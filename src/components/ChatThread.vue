@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Message } from '~/types'
+import { useDebounceFn } from '@vueuse/core'
 import { useChatStore } from '~/stores/chat'
 
 const emit = defineEmits<{
@@ -8,6 +9,7 @@ const emit = defineEmits<{
 const chatStore = useChatStore()
 const messageInput = ref('')
 const messageContainer = ref<HTMLElement>()
+const isDebouncing = ref(false)
 
 // 过滤当前线程和分支的消息
 const messages = computed(() => {
@@ -22,26 +24,30 @@ const messages = computed(() => {
     .sort((a, b) => a.timestamp - b.timestamp)
 })
 
-async function sendMessage() {
+const debouncedSendMessage = useDebounceFn(async () => {
   if (!messageInput.value.trim())
     return
 
+  isDebouncing.value = true
   await chatStore.sendMessage(messageInput.value)
   messageInput.value = ''
-}
+  isDebouncing.value = false
+}, 300)
 
 function handleBranch(message: Message) {
   emit('branch', message)
 }
 
 // 监听消息变化，自动滚动到最新消息
-watch(messages, async (newMessages) => {
+const debouncedScroll = useDebounceFn(async (newMessages: Message[]) => {
   if (newMessages.length > 0) {
     await nextTick()
     if (messageContainer.value)
       messageContainer.value.scrollTop = messageContainer.value.scrollHeight
   }
-}, { deep: true })
+}, 100)
+
+watch(messages, debouncedScroll, { deep: true })
 </script>
 
 <template>
@@ -95,12 +101,12 @@ watch(messages, async (newMessages) => {
           type="text"
           class="flex-1 border rounded-lg px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
           placeholder="Type a message..."
-          @keyup.enter="sendMessage"
+          @keyup.enter="debouncedSendMessage"
         >
         <button
-          class="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-          :disabled="chatStore.isLoading"
-          @click="sendMessage"
+          class="rounded-lg bg-blue-500 px-4 py-2 text-white disabled:cursor-not-allowed hover:bg-blue-600 disabled:opacity-50"
+          :disabled="chatStore.isLoading || isDebouncing"
+          @click="debouncedSendMessage"
         >
           Send
         </button>

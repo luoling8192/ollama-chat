@@ -5,12 +5,11 @@ import { useChatStore } from '~/stores/chat'
 
 const chatStore = useChatStore()
 const selectedMessage = ref<Message | null>(null)
+const isDrawerOpen = ref(false)
 
 onMounted(async () => {
-  // 加载最近的对话
   const threads = await db.getAllThreads()
   if (threads.length > 0) {
-    // 按更新时间排序，获取最近的对话
     const latestThread = threads.sort((a, b) => b.updatedAt - a.updatedAt)[0]
     await chatStore.switchThread(latestThread)
   }
@@ -18,6 +17,10 @@ onMounted(async () => {
 
 function handleBranch(message: Message) {
   selectedMessage.value = message
+}
+
+function toggleDrawer() {
+  isDrawerOpen.value = !isDrawerOpen.value
 }
 </script>
 
@@ -27,6 +30,24 @@ function handleBranch(message: Message) {
     <div class="relative flex flex-1">
       <div class="flex-1">
         <ChatThread @branch="handleBranch" />
+      </div>
+      <button
+        class="fixed bottom-4 right-4 rounded-full bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+        @click="toggleDrawer"
+      >
+        {{ isDrawerOpen ? 'Close' : 'Open' }} Chat View
+      </button>
+
+      <div
+        class="fixed inset-y-0 right-0 w-4/5 transform bg-gray-800 transition-transform duration-300"
+        :class="{ 'translate-x-0': isDrawerOpen, 'translate-x-full': !isDrawerOpen }"
+      >
+        <div class="h-full p-4">
+          <ChatFlow
+            :messages="chatStore.currentMessages"
+            :branches="chatStore.currentBranches"
+          />
+        </div>
       </div>
     </div>
   </div>
