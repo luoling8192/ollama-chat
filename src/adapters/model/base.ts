@@ -1,4 +1,4 @@
-import type { ModelParameters } from '~/types'
+import type { Message, ModelParameters } from '~/types'
 
 // 模型适配器基类
 export interface ModelCapabilities {
@@ -23,12 +23,12 @@ export abstract class BaseModelAdapter {
   abstract capabilities: ModelCapabilities
 
   abstract generateResponse(
-    prompt: string,
+    messages: Message[],
     params: ModelParameters
   ): Promise<ModelResponse>
 
   abstract streamResponse(
-    prompt: string,
+    messages: Message[],
     params: ModelParameters
   ): AsyncIterator<ModelResponse>
 

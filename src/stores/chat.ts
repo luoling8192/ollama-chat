@@ -93,11 +93,20 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     await db.addMessage(message)
-
     messages.value[message.id] = message
-    await generateResponse(message)
+
+    // Get context messages for the current branch
+    const contextMessages = Object.values(messages.value)
+      .filter(msg =>
+        msg.threadId === activeThreadId.value
+        && msg.branchId === (activeBranchId.value || 'main')
+        && msg.timestamp <= message.timestamp,
+      )
+      .sort((a, b) => a.timestamp - b.timestamp)
+
+    await generateResponse(message, contextMessages)
   }
-  async function generateResponse(userMessage: Message): Promise<void> {
+  async function generateResponse(userMessage: Message, contextMessages: Message[]): Promise<void> {
     if (!currentThread.value)
       throw new Error('No active thread')
 
@@ -130,7 +139,7 @@ export const useChatStore = defineStore('chat', () => {
       let fullContent = ''
 
       for await (const chunk of model.streamResponse(
-        userMessage.content.value,
+        contextMessages,
         thread.metadata.parameters,
       )) {
         fullContent += chunk.content
@@ -280,9 +289,60 @@ export const useChatStore = defineStore('chat', () => {
 
   async function switchThread(thread: Thread): Promise<void> {
     await clearState()
+
+    // 加载线程数据
     threads.value[thread.id] = thread
     activeThreadId.value = thread.id
-    await loadThreadData(thread.id)
+
+    // 加载所有消息和分支
+    const msgs = await db.getMessages(thread.id)
+    const branchList = await db.getBranches(thread.id)
+
+    // 更新 store 中的数据
+    msgs.forEach((msg) => {
+      messages.value[msg.id] = msg
+    })
+
+    branchList.forEach((branch) => {
+      branches.value[branch.id] = branch
+    })
+
+    // 更新线程的消息和分支列表
+    thread.messages = msgs
+    thread.branches = branchList
+
+    // 更新 store 中的线程数据
+    threads.value[thread.id] = { ...thread }
+  }
+
+  async function handleBranch(messageId: string): Promise<void> {
+    if (!currentThread.value)
+      return
+
+    const newThread = await createThread(`Branch from ${messageId}`)
+
+    const contextMessages = await getMessageContext(messageId)
+
+    // 复制消息到新线程
+    for (const msg of contextMessages) {
+      const newMessage = {
+        ...msg,
+        id: crypto.randomUUID(),
+        threadId: newThread.id,
+        branchId: 'main',
+      }
+      await db.addMessage(newMessage)
+      messages.value[newMessage.id] = newMessage
+    }
+
+    // 更新新线程的消息列表
+    newThread.messages = Object.values(messages.value)
+      .filter(msg => msg.threadId === newThread.id)
+
+    // 更新 store 中的线程数据
+    threads.value[newThread.id] = { ...newThread }
+
+    await switchThread(newThread)
   }
 
   async function deleteThread(threadId: string): Promise<void> {
@@ -353,6 +413,7 @@ export const useChatStore = defineStore('chat', () => {
     deleteThread,
     updateThread,
     loadThreadData,
+    handleBranch,
   }
 })
 

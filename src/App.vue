@@ -14,26 +14,6 @@ onMounted(async () => {
   }
 })
 
-async function handleBranch(messageId: string) {
-  if (!chatStore.currentThread)
-    return
-
-  const newThread = await chatStore.createThread(`Branch from ${messageId}`)
-
-  const contextMessages = await chatStore.getMessageContext(messageId)
-
-  for (const msg of contextMessages) {
-    await db.addMessage({
-      ...msg,
-      id: crypto.randomUUID(),
-      threadId: newThread.id,
-      branchId: 'main',
-    })
-  }
-
-  await chatStore.switchThread(newThread)
-}
-
 function toggleDrawer() {
   isDrawerOpen.value = !isDrawerOpen.value
 }
@@ -44,7 +24,7 @@ function toggleDrawer() {
     <TheHeader />
     <div class="relative flex flex-1">
       <div class="flex-1">
-        <ChatThread @branch="(message: Message) => handleBranch(message.id)" />
+        <ChatThread @branch="(message: Message) => chatStore.handleBranch(message.id)" />
       </div>
       <button
         class="fixed bottom-4 right-4 rounded-full bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
@@ -62,7 +42,7 @@ function toggleDrawer() {
             :messages="chatStore.currentMessages"
             :branches="chatStore.currentBranches"
             @close="toggleDrawer"
-            @branch="handleBranch"
+            @branch="chatStore.handleBranch"
           />
         </div>
       </div>
