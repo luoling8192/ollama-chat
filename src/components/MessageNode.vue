@@ -30,15 +30,6 @@ function handleBranch() {
       type="source"
       :position="Position.Left"
     />
-    <div class="absolute right-2 -top-3">
-      <button
-        v-if="data.role !== 'system'"
-        class="rounded bg-gray-700 px-2 py-1 text-xs hover:bg-gray-600"
-        @click="handleBranch"
-      >
-        Branch
-      </button>
-    </div>
     <div class="text-sm">
       {{ data.role }}
     </div>
@@ -49,6 +40,14 @@ function handleBranch() {
       type="source"
       :position="Position.Right"
     />
+
+    <button
+      v-if="data.role !== 'system'"
+      class="absolute right-[-48px] top-1/2 flex items-center gap-1 rounded bg-gray-700 px-2 py-1 text-xs -translate-y-1/2 hover:bg-gray-600"
+      @click="handleBranch"
+    >
+      <div i-carbon-fork class="text-base" />
+    </button>
   </div>
 </template>
 

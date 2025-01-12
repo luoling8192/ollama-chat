@@ -173,7 +173,7 @@ watch(
       class="transition-background absolute right-10px top-10px z-10 h-30px w-30px flex cursor-pointer items-center justify-center rounded-full border-none bg-white/10 text-20px text-white duration-200 hover:bg-white/20"
       @click="emit('close')"
     >
-      ×
+      <div i-carbon-close />
     </button>
     <VueFlow
       v-model="nodes"
