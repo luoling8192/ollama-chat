@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { MessageNodeData } from './ChatFlow.vue'
-import { Handle } from '@vue-flow/core'
+import type { MessageNodeData } from '~/types/chatflow'
+import { Handle, Position } from '@vue-flow/core'
 
 defineProps<{
   data: MessageNodeData
@@ -9,13 +9,12 @@ defineProps<{
 
 <template>
   <div
-    class="message-node" :class="[
-      `message-node--${data.role}`,
-    ]"
+    class="message-node"
+    :class="[`message-node--${data.role}`]"
   >
     <Handle
       type="target"
-      position="left"
+      :position="Position.Top"
     />
     <div class="message-content">
       <div class="message-role">
@@ -27,7 +26,7 @@ defineProps<{
     </div>
     <Handle
       type="source"
-      position="right"
+      :position="Position.Bottom"
     />
   </div>
 </template>

@@ -46,6 +46,7 @@ function toggleDrawer() {
           <ChatFlow
             :messages="chatStore.currentMessages"
             :branches="chatStore.currentBranches"
+            @close="toggleDrawer"
           />
         </div>
       </div>
